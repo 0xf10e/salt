@@ -543,7 +543,7 @@ def restore(file_name, jail=None, chroot=None):
     )
 
 
-def audit(jail=None, chroot=None, parsed_output=False, reverse_deps=False):
+def audit(jail=None, chroot=None, list_pkgs=False, list_rev_deps=False):
     '''
     Audits installed packages against known vulnerabilities
 
@@ -571,23 +571,42 @@ def audit(jail=None, chroot=None, parsed_output=False, reverse_deps=False):
         .. code-block:: bash
 
             salt '*' pkg.audit chroot=/path/to/chroot
+
+    list_pkgs
+        Returns a list of vulnerable packages.
+
+        CLI Example:
+
+        .. code-block:: bash
+
+            salt '*' pkg.audit list_pkgs=True
+
+
+    list_rev_deps
+        Returns a dictionary mapping vulnerable packages
+        to a list of packages depending on them.
+
+        CLI Example:
+
+        .. code-block:: bash
+
+            salt '*' pkg.audit list_rev_deps=True
+
+
     '''
-    if parsed_output:
+    if list_pkgs and list_rev_deps:
+        raise SaltInvocationError('Can\'t set both' \
+            '"list_pkgs" and "list_rev_deps" to True.')
+    if list_pkgs or list_rev_deps:
         pkg_list = []
         cmd_output = __salt__['cmd.run'](
             '{0} audit -qF'.format(_pkg(jail, chroot)),
             output_loglevel='debug'
         )
-        pkg_cnt = 0
         for line in cmd_output.splitlines():
             pkg_list += [line]
-            pkg_cnt += 1
-        ret = {
-            'result': pkg_list,
-            'comment': '{0} pkg(s) vulnerable'.format(pkg_cnt),
-            }
-        if not reverse_deps:
-            return ret
+        if not list_rev_deps:
+            return pkg_list
         rdeps = {}
         for pkg_str in pkg_list:
             rdeps[pkg_str] = []
@@ -595,13 +614,9 @@ def audit(jail=None, chroot=None, parsed_output=False, reverse_deps=False):
                 '{0} query %rn {1}'.format(_pkg(jail, chroot), pkg_str),
                 output_loglevel='debug',
             )
-            if query_output:
-                ret['comment'] += '\nPackages depending on {0}: \n'.format(pkg_str)
             for rdep in query_output.splitlines():
-                ret['comment'] += ' - {0}\n'.format(rdep)
                 rdeps[pkg_str] += [rdep]
-        ret['result'] = rdeps
-        return ret
+        return rdeps
 
     return __salt__['cmd.run'](
         '{0} audit -F'.format(_pkg(jail, chroot)),
