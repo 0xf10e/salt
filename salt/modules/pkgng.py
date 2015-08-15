@@ -531,7 +531,7 @@ def restore(file_name, jail=None, chroot=None):
     )
 
 
-def audit(jail=None, chroot=None):
+def audit(jail=None, chroot=None, parsed_output=False, reverse_deps=False):
     '''
     Audits installed packages against known vulnerabilities
 
@@ -560,6 +560,17 @@ def audit(jail=None, chroot=None):
 
             salt '*' pkg.audit chroot=/path/to/chroot
     '''
+    if parsed_output:
+        pkg_list = []
+        cmd_output = __salt__['cmd.run'](
+            '{0} audit -qF'.format(_pkg(jail, chroot)),
+            output_logleven='debug'
+        )
+        for line in cmd_output.splitlines():
+            pkg_list += [line]
+        if not reverse_deps:
+            return pkg_list
+
     return __salt__['cmd.run'](
         '{0} audit -F'.format(_pkg(jail, chroot)),
         python_shell=False,
